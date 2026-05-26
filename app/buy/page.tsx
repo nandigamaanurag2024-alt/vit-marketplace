@@ -14,10 +14,6 @@ type Listing = {
 export default function BuyPage() {
   const [listings, setListings] = useState<Listing[]>([]);
 
-  useEffect(() => {
-    fetchListings();
-  }, []);
-
   const fetchListings = async () => {
     const { data, error } = await supabase
       .from("listings")
@@ -28,6 +24,10 @@ export default function BuyPage() {
       setListings(data);
     }
   };
+
+  useEffect(() => {
+    fetchListings();
+  }, []);
 
   return (
     <main className="min-h-screen bg-black text-white p-8">
@@ -59,10 +59,6 @@ export default function BuyPage() {
               <p className="text-3xl font-bold mt-4">
                 ₹{item.price}
               </p>
-
-              <button className="w-full bg-blue-600 mt-6 p-4 rounded-xl">
-                Chat Seller
-              </button>
             </div>
           </div>
         ))}
