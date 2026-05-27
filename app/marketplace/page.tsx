@@ -25,18 +25,18 @@ export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] =
     useState("All");
 
-  const fetchItems = async () => {
-    const { data, error } = await supabase
-      .from("listings")
-      .select("*")
-      .order("id", { ascending: false });
-
-    if (!error && data) {
-      setItems(data);
-    }
-  };
-
   useEffect(() => {
+    async function fetchItems() {
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (!error && data) {
+        setItems(data);
+      }
+    }
+
     fetchItems();
   }, []);
 
@@ -53,6 +53,7 @@ export default function MarketplacePage() {
         Marketplace
       </h1>
 
+      {/* Categories */}
       <div className="flex gap-4 flex-wrap mb-10">
         {categories.map((category) => (
           <button
@@ -71,11 +72,12 @@ export default function MarketplacePage() {
         ))}
       </div>
 
+      {/* Listings */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {filteredItems.map((item) => (
           <div
             key={item.id}
-            className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800"
+            className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4"
           >
             <img
               src={item.image_url}
