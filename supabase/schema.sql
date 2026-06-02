@@ -6,6 +6,7 @@ create extension if not exists "pgcrypto";
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
+  seller_id uuid references auth.users(id) on delete set null,
   user_id uuid references auth.users(id) on delete set null,
   title text not null,
   description text not null,
@@ -36,22 +37,22 @@ create policy if not exists "Authenticated can insert products"
 on public.products
 for insert
 to authenticated
-with check (auth.uid() = user_id);
+with check (auth.uid() = coalesce(seller_id, user_id));
 
 -- Logged in users can update only their own listings.
 create policy if not exists "Authenticated can update own products"
 on public.products
 for update
 to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+using (auth.uid() = coalesce(seller_id, user_id))
+with check (auth.uid() = coalesce(seller_id, user_id));
 
 -- Optional: allow delete by owner.
 create policy if not exists "Authenticated can delete own products"
 on public.products
 for delete
 to authenticated
-using (auth.uid() = user_id);
+using (auth.uid() = coalesce(seller_id, user_id));
 
 -- Create storage bucket for listing images.
 insert into storage.buckets (id, name, public)

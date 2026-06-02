@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  getSellerAvatarLetter,
+  getSellerDisplayName,
+  resolveProductSellerId,
+  type SellerProfile,
+} from "@/lib/products/seller";
 
 const WISHLIST_KEY = "vit-marketplace-wishlist";
 const PLACEHOLDER_IMAGE =
@@ -24,23 +30,9 @@ type Product = {
   created_at: string | null;
   whatsapp: string | null;
   is_sold: boolean | null;
+  seller_id: string | null;
+  user_id: string | null;
 };
-
-function getSellerDisplayName(sellerName: string | null | undefined) {
-  const trimmed = sellerName?.trim();
-  return trimmed ? trimmed : "Unknown Seller";
-}
-
-function getSellerAvatarLetter(
-  sellerAvatar: string | null | undefined,
-  sellerName: string | null | undefined
-) {
-  const fromAvatar = sellerAvatar?.trim()?.charAt(0);
-  if (fromAvatar) return fromAvatar.toUpperCase();
-  const fromName = sellerName?.trim()?.charAt(0);
-  if (fromName) return fromName.toUpperCase();
-  return "U";
-}
 
 function getGalleryImages(
   imageUrls: string[] | null | undefined,
@@ -57,6 +49,7 @@ function getGalleryImages(
 
 export default function ProductPage() {
   const params = useParams();
+  const router = useRouter();
 
   const rawId = params?.id;
   const id = Array.isArray(rawId)
@@ -66,9 +59,13 @@ export default function ProductPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [messaging, setMessaging] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem(WISHLIST_KEY);
@@ -112,6 +109,18 @@ export default function ProductPage() {
       void loadProduct();
     }
   }, [id]);
+
+  useEffect(() => {
+    async function loadUser() {
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+    }
+
+    void loadUser();
+  }, []);
 
   if (loading) {
     return (
@@ -168,15 +177,31 @@ export default function ProductPage() {
   const displayLocation =
     currentProduct.location?.trim() || "Location not specified";
   const displayPrice = currentProduct.price ?? 0;
-  const displaySellerName = getSellerDisplayName(currentProduct.seller_name);
+  const sellerId = resolveProductSellerId(currentProduct);
+  const displaySellerName = getSellerDisplayName(sellerProfile, currentProduct);
   const displaySellerAvatar = getSellerAvatarLetter(
-    currentProduct.seller_avatar,
-    currentProduct.seller_name
+    sellerProfile,
+    currentProduct
   );
   const displayDate = currentProduct.created_at
     ? new Date(currentProduct.created_at).toLocaleDateString()
     : "Date unknown";
-  const whatsappNumber = currentProduct.whatsapp?.replace(/\D/g, "") ?? "";
+
+  const isOwnListing = Boolean(userId && sellerId && userId === sellerId);
+  const isSold = Boolean(currentProduct.is_sold);
+  const sellerUnavailable = !sellerId;
+  const messageDisabled =
+    messaging || isOwnListing || isSold || sellerUnavailable;
+
+  const messageButtonLabel = messaging
+    ? "Opening chat..."
+    : isOwnListing
+      ? "Your listing"
+      : isSold
+        ? "Item sold"
+        : sellerUnavailable
+          ? "Seller unavailable"
+          : "Message Seller";
 
   const isFavorite = favoriteIds.includes(currentProduct.id);
   const selectedImage =
@@ -204,6 +229,43 @@ export default function ProductPage() {
 
     await navigator.clipboard.writeText(window.location.href);
     alert("Listing link copied to clipboard");
+  }
+
+  async function handleMessageSeller() {
+    setMessageError(null);
+
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      router.push(`/login?next=/marketplace/${currentProduct.id}`);
+      return;
+    }
+
+    if (messageDisabled) return;
+
+    setMessaging(true);
+
+    const { data: conversationId, error: rpcError } = await supabase.rpc(
+      "get_or_create_conversation",
+      { p_product_id: currentProduct.id }
+    );
+
+    if (rpcError) {
+      setMessageError(rpcError.message);
+      setMessaging(false);
+      return;
+    }
+
+    if (!conversationId) {
+      setMessageError("Could not start conversation. Please try again.");
+      setMessaging(false);
+      return;
+    }
+
+    router.push(`/messages/${conversationId}`);
   }
 
   return (
@@ -259,27 +321,21 @@ export default function ProductPage() {
             </div>
 
             <div style={styles.actions}>
-              <a
-                href={
-                  whatsappNumber
-                    ? `https://wa.me/91${whatsappNumber}`
-                    : undefined
-                }
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => {
-                  if (!whatsappNumber) e.preventDefault();
-                }}
+              <button
+                type="button"
+                onClick={() => void handleMessageSeller()}
+                disabled={messageDisabled && Boolean(userId)}
                 style={{
-                  ...styles.whatsappBtn,
-                  ...(!whatsappNumber
-                    ? { opacity: 0.55, pointerEvents: "none" as const }
-                    : {}),
+                  ...styles.messageSellerBtn,
+                  ...(messageDisabled ? styles.messageSellerBtnDisabled : {}),
                 }}
-                aria-disabled={!whatsappNumber}
+                aria-disabled={messageDisabled}
               >
-                Chat on WhatsApp
-              </a>
+                {messageButtonLabel}
+              </button>
+              {messageError ? (
+                <p style={styles.messageError}>{messageError}</p>
+              ) : null}
               <button onClick={shareListing} style={styles.secondaryBtn}>
                 Share
               </button>
@@ -476,10 +532,10 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
     gap: "10px",
   },
-  whatsappBtn: {
-    background: "#22c55e",
+  messageSellerBtn: {
+    background: "#4f46e5",
     color: "#fff",
-    textDecoration: "none",
+    border: "none",
     borderRadius: "12px",
     padding: "12px",
     textAlign: "center",
@@ -489,6 +545,19 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    cursor: "pointer",
+    gridColumn: "1 / -1",
+  },
+  messageSellerBtnDisabled: {
+    opacity: 0.55,
+    cursor: "not-allowed",
+  },
+  messageError: {
+    margin: 0,
+    gridColumn: "1 / -1",
+    color: "#fca5a5",
+    fontSize: "13px",
+    lineHeight: 1.5,
   },
   secondaryBtn: {
     background: "rgba(255,255,255,0.06)",

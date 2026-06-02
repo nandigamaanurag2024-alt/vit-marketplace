@@ -8,6 +8,25 @@ const MAX_FILES = 5;
 const MAX_FILE_SIZE_MB = 5;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+function getStorageExtension(file: File): string {
+  const fromName = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (fromName === "jpeg" || fromName === "jpg") return "jpg";
+  if (fromName === "png") return "png";
+  if (fromName === "webp") return "webp";
+
+  if (file.type === "image/jpeg") return "jpg";
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+
+  return "jpg";
+}
+
+/** Supabase Storage keys: no spaces or special chars in the filename segment. */
+function buildStorageFilePath(userId: string, index: number, file: File): string {
+  const ext = getStorageExtension(file);
+  return `${userId}/${Date.now()}-${index}-image.${ext}`;
+}
+
 export default function SellPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
@@ -22,6 +41,8 @@ export default function SellPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [sellerName, setSellerName] = useState("VIT Student");
+  const [sellerAvatar, setSellerAvatar] = useState("V");
   const router = useRouter();
 
   useEffect(() => {
@@ -37,6 +58,24 @@ export default function SellPage() {
       }
 
       setUserId(user.id);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name,avatar_letter")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const displayName =
+        profile?.display_name?.trim() ||
+        user.email?.split("@")[0]?.trim() ||
+        "VIT Student";
+      const avatarLetter =
+        profile?.avatar_letter?.trim()?.charAt(0)?.toUpperCase() ||
+        displayName.charAt(0)?.toUpperCase() ||
+        "V";
+
+      setSellerName(displayName);
+      setSellerAvatar(avatarLetter);
     }
 
     void loadUser();
@@ -103,7 +142,7 @@ export default function SellPage() {
 
     for (let i = 0; i < files.length; i += 1) {
       const file = files[i];
-      const filePath = `${userId}/${Date.now()}-${i}-${file.name}`;
+      const filePath = buildStorageFilePath(userId, i, file);
 
       const { error: uploadError } = await supabase.storage
         .from("product-images")
@@ -138,9 +177,9 @@ export default function SellPage() {
       whatsapp,
       image_url: uploadedUrls[0],
       image_urls: uploadedUrls,
-      seller_name: "VIT Student",
-      seller_avatar: "S",
-      user_id: userId,
+      seller_id: userId,
+      seller_name: sellerName,
+      seller_avatar: sellerAvatar,
       tags: [category.toLowerCase()],
       is_sold: false,
     });

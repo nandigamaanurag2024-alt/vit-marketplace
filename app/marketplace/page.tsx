@@ -92,7 +92,7 @@ export default function MarketplacePage() {
     if (sortBy === "title-asc") list.sort((a, b) => a.title.localeCompare(b.title));
 
     return list;
-  }, [activeCategory, maxPrice, search, sortBy]);
+  }, [activeCategory, maxPrice, products, search, sortBy]);
 
   function toggleFavorite(productId: string) {
     const updated = favorites.includes(productId)

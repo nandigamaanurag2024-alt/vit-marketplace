@@ -1,9 +1,14 @@
  "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  fetchUnreadMessageCount,
+  formatUnreadBadge,
+  UNREAD_MESSAGES_REFRESH_EVENT,
+} from "@/lib/messaging/unread";
 
 export default function RootLayout({
   children,
@@ -31,11 +36,28 @@ export default function RootLayout({
 
 function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const [hovered, setHovered] = useState<
-    "brand" | "marketplace" | "sell" | "auth"
+    "brand" | "marketplace" | "messages" | "sell" | "auth"
     | null
   >(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshUnreadCount = useCallback(async () => {
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const count = await fetchUnreadMessageCount(supabase, user.id);
+    setUnreadCount(count);
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -54,6 +76,26 @@ function Navbar() {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
+
+    void refreshUnreadCount();
+  }, [isAuthenticated, pathname, refreshUnreadCount]);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      void refreshUnreadCount();
+    };
+
+    window.addEventListener(UNREAD_MESSAGES_REFRESH_EVENT, onRefresh);
+    return () => {
+      window.removeEventListener(UNREAD_MESSAGES_REFRESH_EVENT, onRefresh);
+    };
+  }, [refreshUnreadCount]);
 
   async function handleLogout() {
     const supabase = getSupabaseBrowserClient();
@@ -101,6 +143,25 @@ function Navbar() {
           >
             Wishlist
           </Link>
+
+          {isAuthenticated ? (
+            <Link
+              href="/messages"
+              style={{
+                ...styles.messagesLink,
+                ...(hovered === "messages" ? styles.marketplaceLinkHovered : {}),
+              }}
+              onMouseEnter={() => setHovered("messages")}
+              onMouseLeave={() => setHovered(null)}
+            >
+              Messages
+              {unreadCount > 0 ? (
+                <span style={styles.unreadBadge} aria-label={`${unreadCount} unread messages`}>
+                  {formatUnreadBadge(unreadCount)}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
 
           <Link
             href="/sell"
@@ -236,6 +297,41 @@ const styles: Record<string, React.CSSProperties> = {
     background: "rgba(99,102,241,0.12)",
     transform: "translateY(-1px)",
     boxShadow: "0 8px 20px rgba(99,102,241,0.2)",
+  },
+
+  messagesLink: {
+    color: "#d4d4d8",
+    textDecoration: "none",
+    fontWeight: 600,
+    fontSize: "14px",
+    letterSpacing: "0.01em",
+    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.03)",
+    padding: "10px 14px",
+    borderRadius: "11px",
+    transition: "all 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    position: "relative",
+  },
+
+  unreadBadge: {
+    position: "absolute",
+    top: "-6px",
+    right: "-6px",
+    minWidth: "18px",
+    height: "18px",
+    padding: "0 5px",
+    borderRadius: "999px",
+    background: "#ef4444",
+    color: "#fff",
+    fontSize: "10px",
+    fontWeight: 800,
+    lineHeight: "18px",
+    textAlign: "center",
+    border: "2px solid rgba(10,10,16,0.95)",
+    boxShadow: "0 4px 10px rgba(239,68,68,0.45)",
+    pointerEvents: "none",
   },
 
   sellButton: {
