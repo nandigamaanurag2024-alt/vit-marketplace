@@ -6,23 +6,54 @@ import { useParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 const WISHLIST_KEY = "vit-marketplace-wishlist";
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1486401899868-0e435ed85128?w=900&q=80";
 
 type Product = {
   id: string;
-  title: string;
-  price: number;
-  category: string;
-  condition: string;
-  seller_name: string;
+  title: string | null;
+  price: number | null;
+  category: string | null;
+  condition: string | null;
+  seller_name: string | null;
   seller_avatar: string | null;
   image_url: string | null;
   image_urls: string[] | null;
-  description: string;
-  location: string;
-  created_at: string;
-  whatsapp: string;
+  description: string | null;
+  location: string | null;
+  created_at: string | null;
+  whatsapp: string | null;
   is_sold: boolean | null;
 };
+
+function getSellerDisplayName(sellerName: string | null | undefined) {
+  const trimmed = sellerName?.trim();
+  return trimmed ? trimmed : "Unknown Seller";
+}
+
+function getSellerAvatarLetter(
+  sellerAvatar: string | null | undefined,
+  sellerName: string | null | undefined
+) {
+  const fromAvatar = sellerAvatar?.trim()?.charAt(0);
+  if (fromAvatar) return fromAvatar.toUpperCase();
+  const fromName = sellerName?.trim()?.charAt(0);
+  if (fromName) return fromName.toUpperCase();
+  return "U";
+}
+
+function getGalleryImages(
+  imageUrls: string[] | null | undefined,
+  imageUrl: string | null | undefined
+) {
+  const validUrls = (imageUrls ?? []).filter(
+    (url): url is string => typeof url === "string" && url.trim().length > 0
+  );
+  if (validUrls.length > 0) return validUrls;
+  const fallback = imageUrl?.trim();
+  if (fallback) return [fallback];
+  return [PLACEHOLDER_IMAGE];
+}
 
 export default function ProductPage() {
   const params = useParams();
@@ -62,14 +93,18 @@ export default function ProductPage() {
 
       setProduct(data as Product);
 
-      const { data: relatedData } = await supabase
-        .from("products")
-        .select("*")
-        .eq("category", data.category)
-        .neq("id", data.id)
-        .limit(3);
+      if (data?.category) {
+        const { data: relatedData } = await supabase
+          .from("products")
+          .select("*")
+          .eq("category", data.category)
+          .neq("id", data.id)
+          .limit(3);
 
-      setRelatedProducts((relatedData ?? []) as Product[]);
+        setRelatedProducts((relatedData ?? []) as Product[]);
+      } else {
+        setRelatedProducts([]);
+      }
       setLoading(false);
     }
 
@@ -121,17 +156,31 @@ export default function ProductPage() {
   }
 
   const currentProduct = product;
-  const galleryImages =
-    currentProduct.image_urls && currentProduct.image_urls.length > 0
-      ? currentProduct.image_urls
-      : [
-          currentProduct.image_url ??
-            "https://images.unsplash.com/photo-1486401899868-0e435ed85128?w=900&q=80",
-        ];
+  const galleryImages = getGalleryImages(
+    currentProduct.image_urls,
+    currentProduct.image_url
+  );
+  const displayTitle = currentProduct.title?.trim() || "Untitled product";
+  const displayDescription =
+    currentProduct.description?.trim() || "No description provided.";
+  const displayCategory = currentProduct.category?.trim() || "General";
+  const displayCondition = currentProduct.condition?.trim() || "Not specified";
+  const displayLocation =
+    currentProduct.location?.trim() || "Location not specified";
+  const displayPrice = currentProduct.price ?? 0;
+  const displaySellerName = getSellerDisplayName(currentProduct.seller_name);
+  const displaySellerAvatar = getSellerAvatarLetter(
+    currentProduct.seller_avatar,
+    currentProduct.seller_name
+  );
+  const displayDate = currentProduct.created_at
+    ? new Date(currentProduct.created_at).toLocaleDateString()
+    : "Date unknown";
+  const whatsappNumber = currentProduct.whatsapp?.replace(/\D/g, "") ?? "";
 
   const isFavorite = favoriteIds.includes(currentProduct.id);
   const selectedImage =
-    galleryImages[activeImage] ?? galleryImages[0];
+    galleryImages[activeImage] ?? galleryImages[0] ?? PLACEHOLDER_IMAGE;
 
   function toggleFavorite() {
     const updated = isFavorite
@@ -143,10 +192,10 @@ export default function ProductPage() {
   }
 
   async function shareListing() {
-    const shareText = `Check this item on VIT Marketplace: ${currentProduct.title}`;
+    const shareText = `Check this item on VIT Marketplace: ${displayTitle}`;
     if (navigator.share) {
       await navigator.share({
-        title: currentProduct.title,
+        title: displayTitle,
         text: shareText,
         url: window.location.href,
       });
@@ -165,13 +214,13 @@ export default function ProductPage() {
           <div style={styles.galleryWrap}>
             <img
               src={selectedImage}
-              alt={currentProduct.title}
+              alt={displayTitle}
               style={styles.heroImage}
             />
             <div style={styles.thumbRow}>
               {galleryImages.map((image, i) => (
                 <button
-                  key={image}
+                  key={`${image}-${i}`}
                   onClick={() => setActiveImage(i)}
                   style={{
                     ...styles.thumbButton,
@@ -179,8 +228,8 @@ export default function ProductPage() {
                   }}
                 >
                   <img
-                    src={image}
-                    alt={`${currentProduct.title} ${i + 1}`}
+                    src={image ?? PLACEHOLDER_IMAGE}
+                    alt={`${displayTitle} ${i + 1}`}
                     style={styles.thumbImage}
                   />
                 </button>
@@ -189,36 +238,45 @@ export default function ProductPage() {
           </div>
 
           <div>
-            <p style={styles.category}>{currentProduct.category}</p>
-            <h1 style={styles.title}>{currentProduct.title}</h1>
-            <p style={styles.price}>₹{currentProduct.price.toLocaleString()}</p>
+            <p style={styles.category}>{displayCategory}</p>
+            <h1 style={styles.title}>{displayTitle}</h1>
+            <p style={styles.price}>₹{displayPrice.toLocaleString()}</p>
 
             <div style={styles.chips}>
-              <span style={styles.chip}>{currentProduct.condition}</span>
-              <span style={styles.chip}>📍 {currentProduct.location}</span>
-              <span style={styles.chip}>
-                {new Date(currentProduct.created_at).toLocaleDateString()}
-              </span>
+              <span style={styles.chip}>{displayCondition}</span>
+              <span style={styles.chip}>📍 {displayLocation}</span>
+              <span style={styles.chip}>{displayDate}</span>
             </div>
 
-            <p style={styles.desc}>{currentProduct.description}</p>
+            <p style={styles.desc}>{displayDescription}</p>
 
             <div style={styles.sellerCard}>
-              <div style={styles.avatar}>
-                {currentProduct.seller_avatar?.charAt(0) ??
-                  currentProduct.seller_name.charAt(0)}
-              </div>
+              <div style={styles.avatar}>{displaySellerAvatar}</div>
               <div>
                 <p style={styles.sellerLabel}>Seller</p>
-                <h3 style={styles.sellerName}>{currentProduct.seller_name}</h3>
+                <h3 style={styles.sellerName}>{displaySellerName}</h3>
               </div>
             </div>
 
             <div style={styles.actions}>
               <a
-                href={`https://wa.me/91${currentProduct.whatsapp}`}
+                href={
+                  whatsappNumber
+                    ? `https://wa.me/91${whatsappNumber}`
+                    : undefined
+                }
                 target="_blank"
-                style={styles.whatsappBtn}
+                rel="noreferrer"
+                onClick={(e) => {
+                  if (!whatsappNumber) e.preventDefault();
+                }}
+                style={{
+                  ...styles.whatsappBtn,
+                  ...(!whatsappNumber
+                    ? { opacity: 0.55, pointerEvents: "none" as const }
+                    : {}),
+                }}
+                aria-disabled={!whatsappNumber}
               >
                 Chat on WhatsApp
               </a>
@@ -244,16 +302,17 @@ export default function ProductPage() {
             {relatedProducts.map((item) => (
               <Link key={item.id} href={`/marketplace/${item.id}`} style={styles.relatedCard}>
                 <img
-                  src={
-                    item.image_url ??
-                    "https://images.unsplash.com/photo-1486401899868-0e435ed85128?w=900&q=80"
-                  }
-                  alt={item.title}
+                  src={item.image_url?.trim() || PLACEHOLDER_IMAGE}
+                  alt={item.title?.trim() || "Related product"}
                   style={styles.relatedImage}
                 />
                 <div style={styles.relatedBody}>
-                  <p style={styles.relatedName}>{item.title}</p>
-                  <p style={styles.relatedPrice}>₹{item.price.toLocaleString()}</p>
+                  <p style={styles.relatedName}>
+                    {item.title?.trim() || "Untitled product"}
+                  </p>
+                  <p style={styles.relatedPrice}>
+                    ₹{(item.price ?? 0).toLocaleString()}
+                  </p>
                 </div>
               </Link>
             ))}

@@ -1,6 +1,7 @@
  "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
@@ -29,6 +30,7 @@ export default function RootLayout({
 }
 
 function Navbar() {
+  const router = useRouter();
   const [hovered, setHovered] = useState<
     "brand" | "marketplace" | "sell" | "auth"
     | null
@@ -56,6 +58,7 @@ function Navbar() {
   async function handleLogout() {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signOut();
+    router.refresh();
   }
 
   return (
