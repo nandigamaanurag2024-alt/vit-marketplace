@@ -1,0 +1,39 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js build output
+/.next/
+/out/
+/build
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.*
+!.env.example
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Vercel
+.vercel
+
+# TypeScript / lint cache
+*.tsbuildinfo
+.eslintcache
+
+# Testing
+/coverage
