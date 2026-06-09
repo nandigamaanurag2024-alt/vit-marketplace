@@ -86,27 +86,33 @@ export default function MessagesInboxPage() {
       const conversationSelectBase =
         "id,product_id,buyer_id,seller_id,last_message_at,last_message_preview,created_at";
 
-      let { data: conversations, error: convError } = await supabase
+      let conversationsData: ConversationRow[] | null = null;
+      let convError: { message: string } | null = null;
+
+      const primaryResult = await supabase
         .from("conversations")
         .select(conversationSelectWithRead)
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
 
+      conversationsData = (primaryResult.data ?? null) as ConversationRow[] | null;
+      convError = primaryResult.error;
+
       if (convError) {
         console.error(
           "[messages/inbox] conversations query (with read columns) failed:",
           convError.message
         );
-        const fallback = await supabase
+        const fallbackResult = await supabase
           .from("conversations")
           .select(conversationSelectBase)
           .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
           .order("last_message_at", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false });
 
-        conversations = fallback.data;
-        convError = fallback.error;
+        conversationsData = (fallbackResult.data ?? null) as ConversationRow[] | null;
+        convError = fallbackResult.error;
       }
 
       if (convError) {
@@ -117,7 +123,7 @@ export default function MessagesInboxPage() {
         return;
       }
 
-      const rows = (conversations ?? []) as ConversationRow[];
+      const rows = conversationsData ?? [];
       if (rows.length === 0) {
         if (loadSeq === loadSeqRef.current) {
           setItems([]);

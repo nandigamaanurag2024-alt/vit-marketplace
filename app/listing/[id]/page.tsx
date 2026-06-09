@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 import { useParams } from "next/navigation";
 
 type Listing = {
@@ -21,11 +21,17 @@ export default function ListingPage() {
   );
 
   useEffect(() => {
+    const rawId = params?.id;
+    const id = Array.isArray(rawId) ? rawId[0] : rawId;
+
+    if (!id) return;
+
     async function fetchItem() {
+      const supabase = getSupabaseBrowserClient();
       const { data } = await supabase
         .from("listings")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", id)
         .single();
 
       if (data) {
@@ -33,7 +39,7 @@ export default function ListingPage() {
       }
     }
 
-    fetchItem();
+    void fetchItem();
   }, [params.id]);
 
   if (!item) {
