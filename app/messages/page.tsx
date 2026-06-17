@@ -216,7 +216,9 @@ export default function MessagesInboxPage() {
   }, []);
 
   useEffect(() => {
-    void loadInbox();
+    queueMicrotask(() => {
+      void loadInbox();
+    });
   }, [loadInbox, pathname]);
 
   // Refresh inbox when returning from a thread (read state updated elsewhere).

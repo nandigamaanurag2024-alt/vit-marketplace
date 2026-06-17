@@ -7,7 +7,11 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 const WISHLIST_KEY = "vit-marketplace-wishlist";
 
 export default function WishlistPage() {
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem(WISHLIST_KEY);
+    return saved ? (JSON.parse(saved) as string[]) : [];
+  });
   const [products, setProducts] = useState<
     {
       id: string;
@@ -19,10 +23,6 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem(WISHLIST_KEY);
-    const parsedIds = saved ? (JSON.parse(saved) as string[]) : [];
-    setFavoriteIds(parsedIds);
-
     async function loadFavorites(ids: string[]) {
       if (ids.length === 0) {
         setProducts([]);
@@ -40,7 +40,7 @@ export default function WishlistPage() {
       setLoading(false);
     }
 
-    void loadFavorites(parsedIds);
+    void loadFavorites(favoriteIds);
   }, []);
 
   const favoriteProducts = useMemo(() => products, [products]);

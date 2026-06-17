@@ -56,7 +56,7 @@ using (auth.uid() = coalesce(seller_id, user_id));
 
 -- Create storage bucket for listing images.
 insert into storage.buckets (id, name, public)
-values ('product-images', 'product-images', true)
+values ('listing-images', 'listing-images', true)
 on conflict (id) do nothing;
 
 -- Public read for product images.
@@ -64,11 +64,11 @@ create policy if not exists "Public can view product images"
 on storage.objects
 for select
 to anon, authenticated
-using (bucket_id = 'product-images');
+using (bucket_id = 'listing-images');
 
--- Authenticated users can upload to product-images bucket.
+-- Authenticated users can upload to listing-images bucket.
 create policy if not exists "Authenticated can upload product images"
 on storage.objects
 for insert
 to authenticated
-with check (bucket_id = 'product-images');
+with check (bucket_id = 'listing-images');

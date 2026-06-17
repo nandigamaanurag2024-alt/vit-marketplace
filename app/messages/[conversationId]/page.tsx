@@ -144,7 +144,9 @@ export default function ConversationThreadPage() {
   }, [conversationId]);
 
   useEffect(() => {
-    void loadThread();
+    queueMicrotask(() => {
+      void loadThread();
+    });
   }, [loadThread]);
 
   useEffect(() => {

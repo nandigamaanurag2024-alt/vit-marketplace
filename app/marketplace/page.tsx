@@ -32,17 +32,16 @@ export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [maxPrice, setMaxPrice] = useState(5000);
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem(WISHLIST_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(WISHLIST_KEY);
-    if (saved) {
-      setFavorites(JSON.parse(saved));
-    }
-
     async function loadProducts() {
       setLoading(true);
       setError(null);

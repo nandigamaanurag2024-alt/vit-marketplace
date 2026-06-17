@@ -57,7 +57,11 @@ export default function ProductPage() {
     : rawId ?? "";
 
   const [activeImage, setActiveImage] = useState(0);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem(WISHLIST_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
   const [product, setProduct] = useState<Product | null>(null);
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -68,12 +72,10 @@ export default function ProductPage() {
   const [messageError, setMessageError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(WISHLIST_KEY);
-    if (saved) setFavoriteIds(JSON.parse(saved));
-
     async function loadProduct() {
       setLoading(true);
       setError(null);
+      setSellerProfile(null);
 
       const supabase = getSupabaseBrowserClient();
       const { data, error: productError } = await supabase
@@ -88,14 +90,26 @@ export default function ProductPage() {
         return;
       }
 
-      setProduct(data as Product);
+      const productData = data as Product;
+      setProduct(productData);
 
-      if (data?.category) {
+      const sellerIdForProfile = resolveProductSellerId(productData);
+      if (sellerIdForProfile) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("display_name,avatar_letter")
+          .eq("id", sellerIdForProfile)
+          .maybeSingle();
+
+        setSellerProfile((profileData as SellerProfile | null) ?? null);
+      }
+
+      if (productData.category) {
         const { data: relatedData } = await supabase
           .from("products")
           .select("*")
-          .eq("category", data.category)
-          .neq("id", data.id)
+          .eq("category", productData.category)
+          .neq("id", productData.id)
           .limit(3);
 
         setRelatedProducts((relatedData ?? []) as Product[]);

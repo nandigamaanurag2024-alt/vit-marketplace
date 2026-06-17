@@ -145,7 +145,7 @@ export default function SellPage() {
       const filePath = buildStorageFilePath(userId, i, file);
 
       const { error: uploadError } = await supabase.storage
-        .from("product-images")
+        .from("listing-images")
         .upload(filePath, file, {
           cacheControl: "3600",
           upsert: false,
@@ -158,7 +158,7 @@ export default function SellPage() {
       }
 
       const { data: publicUrlData } = supabase.storage
-        .from("product-images")
+        .from("listing-images")
         .getPublicUrl(filePath);
 
       uploadedUrls.push(publicUrlData.publicUrl);

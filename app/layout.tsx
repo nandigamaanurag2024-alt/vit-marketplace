@@ -79,12 +79,15 @@ function Navbar() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setUnreadCount(0);
       return;
     }
 
-    void refreshUnreadCount();
+    queueMicrotask(() => {
+      void refreshUnreadCount();
+    });
   }, [isAuthenticated, pathname, refreshUnreadCount]);
+
+  const displayUnreadCount = isAuthenticated ? unreadCount : 0;
 
   useEffect(() => {
     const onRefresh = () => {
@@ -155,9 +158,9 @@ function Navbar() {
               onMouseLeave={() => setHovered(null)}
             >
               Messages
-              {unreadCount > 0 ? (
-                <span style={styles.unreadBadge} aria-label={`${unreadCount} unread messages`}>
-                  {formatUnreadBadge(unreadCount)}
+              {displayUnreadCount > 0 ? (
+                <span style={styles.unreadBadge} aria-label={`${displayUnreadCount} unread messages`}>
+                  {formatUnreadBadge(displayUnreadCount)}
                 </span>
               ) : null}
             </Link>
